@@ -496,7 +496,7 @@ def save_to_s3(data, bucket_name, file_name):
         logger.error(f"S3 저장 중 오류 발생: {e}")
         return False
 
-def lambda_handler(event, context):
+def handler(event, context):
     """Lambda 핸들러 함수"""
     try:
         # 버킷 이름 확인
