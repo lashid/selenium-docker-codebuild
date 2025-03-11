@@ -581,3 +581,5 @@ def handler(event, context):
                 'message': '크롤링 실행 중 오류가 발생했습니다.'
             }, ensure_ascii=False)
         }
+if name == 'main':
+    handler()
