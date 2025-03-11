@@ -25,3 +25,4 @@ sqlalchemy==1.4.39
 selenium
 requests
 python-dotenv
+boto3
