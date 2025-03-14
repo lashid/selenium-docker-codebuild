@@ -358,34 +358,49 @@ class DaumExchangeRateCrawler:
                 logger.warning("데이터를 추출할 수 없습니다.")
                 return None
             
-            # 1. 정확히 "1회" 찾기
+            # 1. 정확히 session_number 찾기
             for item in data:
                 if item["고시회차"] == session_number:
                     logger.info(f"'{session_number}'를 정확히 찾았습니다!")
                     return item
             
-            # 2. 마지막 페이지 버튼을 한 번 더 클릭
-            logger.info("'1회'를 찾지 못해 마지막 페이지 버튼을 한 번 더 클릭합니다")
-            try:
-                last_page_button_xpath = "/html/body/div/div[4]/div/div[4]/div[3]/div[2]/div/div/a[11]"
-                last_page_button = WebDriverWait(self.driver, 5).until(
-                    EC.element_to_be_clickable((By.XPATH, last_page_button_xpath))
-                )
-                self.driver.execute_script("arguments[0].click();", last_page_button)
-                logger.info("마지막 페이지 버튼 추가 클릭 성공")
-                time.sleep(3)
-                
-                # 페이지 다시 로드 후 데이터 추출
-                data = self.extract_exchange_data()
-                
-                # 다시 1회 찾기
-                if data:
-                    for item in data:
-                        if item["고시회차"] == "1회":
-                            logger.info(f"마지막 페이지 추가 클릭 후 '1회'를 찾았습니다!")
-                            return item
-            except Exception as e:
-                logger.error(f"마지막 페이지 버튼 추가 클릭 중 오류: {e}")
+            # 2. 마지막 페이지 버튼을 한 번 더 클릭 시도
+            logger.info(f"'{session_number}'를 찾지 못해 마지막 페이지 버튼을 한 번 더 클릭합니다")
+            
+            # 마지막 페이지 버튼이 없을 경우 인덱스를 줄여가며 시도
+            found_button = False
+            for index in range(11, 0, -1):  # 11부터 1까지 시도 (충분한 범위)
+                try:
+                    last_page_button_xpath = f"/html/body/div/div[4]/div/div[4]/div[3]/div[2]/div/div/a[{index}]"
+                    last_page_button = WebDriverWait(self.driver, 2).until(
+                        EC.element_to_be_clickable((By.XPATH, last_page_button_xpath))
+                    )
+                    
+                    # 버튼 텍스트 확인 (페이지 번호 또는 '>' 기호 등)
+                    button_text = last_page_button.text.strip()
+                    logger.info(f"발견한 버튼 (인덱스 {index}): '{button_text}'")
+                    
+                    # 버튼 클릭
+                    self.driver.execute_script("arguments[0].click();", last_page_button)
+                    logger.info(f"인덱스 {index}의 페이지 버튼 클릭 성공")
+                    time.sleep(3)
+                    found_button = True
+                    break
+                except Exception as e:
+                    logger.debug(f"인덱스 {index}의 페이지 버튼 찾기 실패: {e}")
+            
+            if not found_button:
+                logger.warning("마지막 페이지 버튼을 찾지 못했습니다.")
+            
+            # 페이지 다시 로드 후 데이터 추출
+            data = self.extract_exchange_data()
+            
+            # 다시 session_number 찾기
+            if data:
+                for item in data:
+                    if item["고시회차"] == session_number:
+                        logger.info(f"마지막 페이지 추가 클릭 후 '{session_number}'를 찾았습니다!")
+                        return item
             
             # 3. 숫자 추출 및 가장 낮은 숫자 찾기
             session_with_numbers = []
@@ -395,9 +410,9 @@ class DaumExchangeRateCrawler:
                         numbers = re.findall(r'\d+', item["고시회차"])
                         if numbers:
                             try:
-                                session_number = int(numbers[0])
-                                session_with_numbers.append((session_number, item))
-                                logger.info(f"숫자가 포함된 회차 발견: {item['고시회차']} (숫자: {session_number})")
+                                extracted_number = int(numbers[0])
+                                session_with_numbers.append((extracted_number, item))
+                                logger.info(f"숫자가 포함된 회차 발견: {item['고시회차']} (숫자: {extracted_number})")
                             except ValueError:
                                 continue
             
